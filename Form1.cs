@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 
 using Ionic.Zip;
@@ -28,17 +29,33 @@ namespace shuffleMobile
         public Form1()
         {
             InitializeComponent();
-
             string[] files = Directory.GetFiles("Deploy\\assets");
 
             if (Directory.Exists("pvr"))
                 Directory.Delete("pvr", true);
             Directory.CreateDirectory("pvr");
+            if (Directory.Exists("pkm2"))
+                Directory.Delete("pkm2", true);
+            Directory.CreateDirectory("pkm2");
             foreach (string t in files)
                 dump(t);
         }
 
-        private string pvrConvert = @"FOR %%c in (*.pvr) do PVRTexToolCLI.exe -i %%c -d -f r8g8b8a8";
+        private void renameTGA()
+        {
+            string[] filesTGA =
+                Directory.GetFiles(@"C:\Users\Kurt\Documents\Visual Studio 2012\Projects\shuffleMobile\bin\Debug\tga");
+
+            foreach (string f in filesTGA)
+            {
+                string parent = new FileInfo(f).Directory.FullName;
+                string file = Path.GetFileName(f).Replace("(", "").Replace(")", "").Replace(" ", "_");
+                File.Move(f, Path.Combine(parent, file));
+            }
+        }
+
+        internal static string pvrConvert = @"FOR %%c in (*.pvr) do PVRTexToolCLI.exe -i %%c -d -f r8g8b8a8";
+        internal static string pkmConvert = @"FOR %%c in (*.tga) do etc1tool.exe %%c --decode";
         private void dump(string filename)
         {
 
@@ -73,7 +90,7 @@ namespace shuffleMobile
                         Zip.ExtractAll(filename + "_d");
                     }
                     // Decrypt File
-                    File.Delete(ZipName);
+                    File.Delete(outlet);
 
                     file = Path.Combine(filename + "_d", file);
                     if ((Archive.Files[i].F2 & 0x200) > 0)
@@ -86,8 +103,6 @@ namespace shuffleMobile
                     // Check for PVR
                     try
                     {
-                        if (new FileInfo(filename).Name == "362C0000" && i == 52)
-                            return;
                         byte[] z = File.ReadAllBytes(file);
                         int off = BitConverter.ToInt32(z, 0x4);
                         int val = (BitConverter.ToInt32(z, 0x2C + off) & 0xFFFFFF);
@@ -95,24 +110,45 @@ namespace shuffleMobile
                         {
                             File.WriteAllBytes(Path.Combine("pvr", Archive.Files[i].NameHash + "_" + i.ToString("0000") + ".pvr"), z.Skip(off).ToArray());
                             File.Delete(file);
+                            continue;
                         }
                     } catch {}
                     // Check for GHVK pack
                     try
                     {
-
                         byte[] z = File.ReadAllBytes(file);
                         if ((BitConverter.ToUInt32(z, 0)) == 0x4B564847)
                         {
-                            int count = BitConverter.ToInt16(z, 6);
-                            int o1 = BitConverter.ToInt32(z, 0x40);
+                            int count = BitConverter.ToInt16(z, 8);
+                            // int o1 = BitConverter.ToInt32(z, 0x40);
                             int o2 = BitConverter.ToInt32(z, 0x44);
-                            int o3 = BitConverter.ToInt32(z, 0x48);
+                            // int o3 = BitConverter.ToInt32(z, 0x48);
                             int o4 = BitConverter.ToInt32(z, 0x4C);
                             int o5 = BitConverter.ToInt32(z, 0x50);
+
+                            string[] filenames = new string[count];
+                            byte[][] files = new byte[count][];
+
+                            for (int f = 0; f < count; f++)
+                            {
+                                int startstr = BitConverter.ToInt32(z, o4 + f*4);
+                                int offset = BitConverter.ToInt32(z, o5 + f*4);
+                                int length = BitConverter.ToInt32(z, o2 + f*4);
+                                filenames[f] = Encoding.ASCII.GetString(z.Skip(startstr).TakeWhile(b => !b.Equals(0)).ToArray());
+                                files[f] = z.Skip(offset).Take(length).ToArray();
+
+                                string outFile = Path.Combine("pkm2", Archive.Files[i].NameHash.ToString("X8"), filenames[f]);
+                                new FileInfo(outFile).Directory.Create();
+
+                                File.WriteAllBytes(outFile, files[f]);
+                            }
+                            
+                            File.Delete(file);
+                            continue;
                         }
 
-                    } catch {}
+                    } 
+                    catch {}
                 }
             }
         }
