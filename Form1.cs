@@ -44,7 +44,7 @@ namespace shuffleMobile
         private void renameTGA()
         {
             string[] filesTGA =
-                Directory.GetFiles(@"C:\Users\Kurt\Documents\Visual Studio 2012\Projects\shuffleMobile\bin\Debug\tga");
+                Directory.GetFiles("tga");
 
             foreach (string f in filesTGA)
             {
@@ -78,26 +78,32 @@ namespace shuffleMobile
                     File.WriteAllBytes(outlet, ZipBuffer);
 
                     string file = "";
-
-                    using (ZipFile Zip = new ZipFile(outlet))
+                    try
                     {
-                        if (Zip.Count() == 1)
+                        using (ZipFile Zip = new ZipFile(outlet))
                         {
-                            string FileName = Zip[0].FileName.Trim('\0');
-                            if (FileName == "") Zip[0].FileName = file = i.ToString("0000");
-                            Zip.Save();
+                            if (Zip.Count() == 1)
+                            {
+                                file = Zip[0].FileName.Trim('\0');
+                                if (file == "") Zip[0].FileName = file = i.ToString("0000");
+                                Zip.Save();
+                            }
+                            Zip.ExtractAll(filename + "_d");
                         }
-                        Zip.ExtractAll(filename + "_d");
-                    }
-                    // Decrypt File
-                    File.Delete(outlet);
+                        // Decrypt File
+                        File.Delete(outlet);
 
-                    file = Path.Combine(filename + "_d", file);
-                    if ((Archive.Files[i].F2 & 0x200) > 0)
+                        file = Path.Combine(filename + "_d", file);
+                        if ((Archive.Files[i].F2 & 0x200) > 0)
+                        {
+                            byte[] data = File.ReadAllBytes(file);
+                            XOR(data);
+                            File.WriteAllBytes(file, data);
+                        }
+                    }
+                    catch
                     {
-                        byte[] data = File.ReadAllBytes(file);
-                        XOR(data);
-                        File.WriteAllBytes(file, data);
+                        file = i.ToString("0000");
                     }
 
                     // Check for PVR
